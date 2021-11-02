@@ -774,7 +774,7 @@ QTMWidget::dropEvent (QDropEvent *event)
 #else
       name= from_qstring (l[i].toLocalFile ());
 #endif
-      string extension = suffix (name);
+      string extension = suffix (url_system(name));
       if ((extension == "eps") || (extension == "ps")   ||
 #if (QT_VERSION >= 0x050000)
           (extension == "svg") ||
@@ -785,6 +785,10 @@ QTMWidget::dropEvent (QDropEvent *event)
         qt_pretty_image_size (url_system (name), w, h);
         tree im (IMAGE, name, w, h, "", "");
         doc << im;
+      } else if (extension == "tm") {
+        string file = "(system->url " * scm_quote (name) * ")";
+        string cmd = "(load-document " * file * ")";
+        exec_delayed (scheme_cmd (cmd));
       } else {
         doc << name;
       }

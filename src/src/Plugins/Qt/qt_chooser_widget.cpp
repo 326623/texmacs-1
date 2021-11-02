@@ -27,6 +27,7 @@
 #include <QStringList>
 #include <QFileDialog>
 #include <QByteArray>
+#include <QOperatingSystemVersion>
 
 /*!
   \param _cmd  Scheme closure to execute after the dialog is closed.
@@ -208,118 +209,182 @@ qt_chooser_widget_rep::perform_dialog () {
   QString caption = to_qstring (win_title);
   c_string tmp (directory * "/" * file);
   QString path = QString::fromUtf8 (tmp);
-  
-#if (defined(Q_OS_MAC) )// || defined(Q_WS_WIN)) //at least windows Xp and 7 lack image preview, switch to custom dialog
-  QFileDialog* dialog = new QFileDialog (NULL, caption, path);
-#else
-  QTMFileDialog*  dialog;
-  QTMImageDialog* imgdialog = 0; // to avoid a dynamic_cast
-  
-  if (type == "image")
-    dialog = imgdialog = new QTMImageDialog (NULL, caption, path);
-  else
-    dialog = new QTMFileDialog (NULL, caption, path);
-#endif
-  
-  dialog->setViewMode (QFileDialog::Detail);
-  if (type == "directory")
-    dialog->setFileMode (QFileDialog::Directory);
-  else if (type == "image" && prompt == "")
-    // check non saving mode just in case we support it
-    dialog->setFileMode (QFileDialog::ExistingFile);
-  else
-    dialog->setFileMode (QFileDialog::AnyFile);
 
-  if (prompt != "") {
-    string text= prompt;
-    if (ends (text, ":")) text= text (0, N(text) - 1);
-    if (ends (text, " as")) text= text (0, N(text) - 3);
-    dialog->setDefaultSuffix (defaultSuffix);
-    dialog->setAcceptMode (QFileDialog::AcceptSave);
-    dialog->setLabelText (QFileDialog::Accept, to_qstring (translate (text)));
-  }
+  auto OSVersion = QOperatingSystemVersion::current();
+  auto OSType = QOperatingSystemVersion::currentType();
+
+  if ((OSType == QOperatingSystemVersion::Windows &&
+       OSVersion >= QOperatingSystemVersion::Windows8) ||
+      OSType == QOperatingSystemVersion::MacOS) {
+    QFileDialog* dialog = new QFileDialog (NULL, caption, path);
+
+    dialog->setViewMode (QFileDialog::Detail);
+    if (type == "directory")
+      dialog->setFileMode (QFileDialog::Directory);
+    else if (type == "image" && prompt == "")
+      // check non saving mode just in case we support it
+      dialog->setFileMode (QFileDialog::ExistingFile);
+    else
+      dialog->setFileMode (QFileDialog::AnyFile);
+
+    if (prompt != "") {
+      string text= prompt;
+      if (ends (text, ":")) text= text (0, N(text) - 1);
+      if (ends (text, " as")) text= text (0, N(text) - 3);
+      dialog->setDefaultSuffix (defaultSuffix);
+      dialog->setAcceptMode (QFileDialog::AcceptSave);
+      dialog->setLabelText (QFileDialog::Accept, to_qstring (translate (text)));
+    }
 
 #if (QT_VERSION >= 0x040400)
-  if (type != "directory") {
-    QStringList filters;
-    if (nameFilter != "")
-      filters << nameFilter;
-    filters << to_qstring (translate ("All files (*)"));
-    dialog->setNameFilters (filters);
-  }
+    if (type != "directory") {
+      QStringList filters;
+      if (nameFilter != "")
+        filters << nameFilter;
+      filters << to_qstring (translate ("All files (*)"));
+      dialog->setNameFilters (filters);
+    }
 #endif
 
-  dialog->updateGeometry();
-  QSize   sz = dialog->sizeHint();
-  QPoint pos = to_qpoint (position);
-  QRect r;
+    dialog->updateGeometry();
+    QSize   sz = dialog->sizeHint();
+    QPoint pos = to_qpoint (position);
+    QRect r;
 
-  r.setSize (sz);
-  r.moveCenter (pos);
-  dialog->setGeometry (r);
-  
-  QStringList fileNames;
-  file = "#f";
-  if (dialog->exec ()) {
-    fileNames = dialog->selectedFiles();
-    if (fileNames.count() > 0) {
-      QString imqstring = fileNames.first();
-      // QTBUG-59401: QFileDialog::setDefaultSuffix doesn't work when file path contains a dot
-      if (!defaultSuffix.isEmpty() && imqstring.contains(QLatin1Char('/'))
-          && !imqstring.endsWith(QLatin1Char('/'))
-          && imqstring.indexOf(QLatin1Char('.'), imqstring.lastIndexOf(QLatin1Char('/'))) == -1) {
-            imqstring = imqstring + QLatin1Char('.') + defaultSuffix;
+    r.setSize (sz);
+    r.moveCenter (pos);
+    dialog->setGeometry (r);
+
+    QStringList fileNames;
+    file = "#f";
+    if (dialog->exec ()) {
+      fileNames = dialog->selectedFiles();
+      if (fileNames.count() > 0) {
+        QString imqstring = fileNames.first();
+        // QTBUG-59401: QFileDialog::setDefaultSuffix doesn't work when file path contains a dot
+        if (!defaultSuffix.isEmpty() && imqstring.contains(QLatin1Char('/'))
+            && !imqstring.endsWith(QLatin1Char('/'))
+            && imqstring.indexOf(QLatin1Char('.'), imqstring.lastIndexOf(QLatin1Char('/'))) == -1) {
+          imqstring = imqstring + QLatin1Char('.') + defaultSuffix;
+        }
+        string imname    = from_qstring_utf8 (imqstring);
+        file = "(system->url " * scm_quote (imname) * ")";
+        if (type == "image") {
+
+#if defined(Q_OS_MAC) //MacOs only now
+          /*
+          QPixmap pic (fileNames.first()); // Qt can't eps & pdf in windows.
+          string params;
+          // HACK: which value should we choose here?
+          //On other platforms we call image_size (u,  w,  h) which returns size in pt units.
+          int ww = get_current_editor()->get_page_width (false) / PIXEL;
+          int  w = pic.width ();
+          int  h = pic.height ();
+          string unit= "pt";
+          if (w == 0)
+            image_size (url_system (imname), w, h);
+          if (w >= ww) {
+            h= (int) ((((double) h) / ((double) w)) * ((double) ww));
+            w= ww;
           }
-      string imname    = from_qstring_utf8 (imqstring);
-      file = "(system->url " * scm_quote (imname) * ")";
-      if (type == "image") {
-#if !defined(Q_OS_MAC) // && !defined(Q_WS_WIN)   //at least windows Xp and 7 lack image preview, switch to custom dialog
-        file = "(list " * file * imgdialog->getParamsAsString () * ")"; //set image size from preview
-#else //MacOs only now
-        /*
-        QPixmap pic (fileNames.first()); // Qt can't eps & pdf in windows.
-        string params;
-        // HACK: which value should we choose here?
-        //On other platforms we call image_size (u,  w,  h) which returns size in pt units.
-        int ww = get_current_editor()->get_page_width (false) / PIXEL;
-        int  w = pic.width ();
-        int  h = pic.height ();
-        string unit= "pt";
-        if (w == 0)
-          image_size (url_system (imname), w, h);
-        if (w >= ww) {
-          h= (int) ((((double) h) / ((double) w)) * ((double) ww));
-          w= ww;
-        }
-        if (w > 0) {
-          params << "\"" << as_string (w) << unit << "\" "
-                 << "\"" << as_string (h) << unit << "\" "
+          if (w > 0) {
+            params << "\"" << as_string (w) << unit << "\" "
+                   << "\"" << as_string (h) << unit << "\" "
+                   << "\"" << "" << "\" "  // xps ??
+                   << "\"" << "" << "\"";   // yps ??
+          }
+          else {
+            params << "\"" << as_string (ww) << "px\" "
+                   << "\"" << "" << "\" "
+                   << "\"" << "" << "\" "  // xps ??
+                   << "\"" << "" << "\"";   // yps ??
+          }
+          file = "(list " * file * params * ")";
+          */
+          url u= url_system (imname);
+          string w, h;
+          qt_pretty_image_size (u, w, h);
+          string params;
+          params << "\"" << w << "\" "
+                 << "\"" << h << "\" "
                  << "\"" << "" << "\" "  // xps ??
                  << "\"" << "" << "\"";   // yps ??
-        }
-        else {
-          params << "\"" << as_string (ww) << "px\" "
-                 << "\"" << "" << "\" "
-                 << "\"" << "" << "\" "  // xps ??
-                 << "\"" << "" << "\"";   // yps ??
-        }
-        file = "(list " * file * params * ")";
-        */
-        url u= url_system (imname);
-        string w, h;
-        qt_pretty_image_size (u, w, h);
-        string params;
-        params << "\"" << w << "\" "
-               << "\"" << h << "\" "
-               << "\"" << "" << "\" "  // xps ??
-               << "\"" << "" << "\"";   // yps ??
-        file = "(list " * file * " " * params * ")";
+          file = "(list " * file * " " * params * ")";
 #endif
+        }
       }
     }
-  }
 
-  delete dialog;
+    delete dialog;
+  }
+  else {
+    QTMFileDialog*  dialog;
+    QTMImageDialog* imgdialog = 0; // to avoid a dynamic_cast
+
+    if (type == "image")
+      dialog = imgdialog = new QTMImageDialog (NULL, caption, path);
+    else
+      dialog = new QTMFileDialog (NULL, caption, path);
+
+    dialog->setViewMode (QFileDialog::Detail);
+    if (type == "directory")
+      dialog->setFileMode (QFileDialog::Directory);
+    else if (type == "image" && prompt == "")
+      // check non saving mode just in case we support it
+      dialog->setFileMode (QFileDialog::ExistingFile);
+    else
+      dialog->setFileMode (QFileDialog::AnyFile);
+
+    if (prompt != "") {
+      string text= prompt;
+      if (ends (text, ":")) text= text (0, N(text) - 1);
+      if (ends (text, " as")) text= text (0, N(text) - 3);
+      dialog->setDefaultSuffix (defaultSuffix);
+      dialog->setAcceptMode (QFileDialog::AcceptSave);
+      dialog->setLabelText (QFileDialog::Accept, to_qstring (translate (text)));
+    }
+
+#if (QT_VERSION >= 0x040400)
+    if (type != "directory") {
+      QStringList filters;
+      if (nameFilter != "")
+        filters << nameFilter;
+      filters << to_qstring (translate ("All files (*)"));
+      dialog->setNameFilters (filters);
+    }
+#endif
+
+    dialog->updateGeometry();
+    QSize   sz = dialog->sizeHint();
+    QPoint pos = to_qpoint (position);
+    QRect r;
+
+    r.setSize (sz);
+    r.moveCenter (pos);
+    dialog->setGeometry (r);
+
+    QStringList fileNames;
+    file = "#f";
+    if (dialog->exec ()) {
+      fileNames = dialog->selectedFiles();
+      if (fileNames.count() > 0) {
+        QString imqstring = fileNames.first();
+        // QTBUG-59401: QFileDialog::setDefaultSuffix doesn't work when file path contains a dot
+        if (!defaultSuffix.isEmpty() && imqstring.contains(QLatin1Char('/'))
+            && !imqstring.endsWith(QLatin1Char('/'))
+            && imqstring.indexOf(QLatin1Char('.'), imqstring.lastIndexOf(QLatin1Char('/'))) == -1) {
+          imqstring = imqstring + QLatin1Char('.') + defaultSuffix;
+        }
+        string imname    = from_qstring_utf8 (imqstring);
+        file = "(system->url " * scm_quote (imname) * ")";
+        if (type == "image") {
+          file = "(list " * file * imgdialog->getParamsAsString () * ")"; //set image size from preview
+        }
+      }
+    }
+
+    delete dialog;
+  }
   
   cmd ();
   if (!is_nil (quit)) quit ();
