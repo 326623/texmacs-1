@@ -11,6 +11,7 @@
 #ifndef QT_CHOOSER_WIDGET_HPP
 #define QT_CHOOSER_WIDGET_HPP
 
+#include <QFileDialog>
 #include "qt_widget.hpp"
 #include "qt_utilities.hpp"
 
@@ -45,6 +46,9 @@ public:
   
   bool set_type (const string& _type);
   void perform_dialog();
+
+private:
+  template <typename FileDialog> string file_dialog_helper (FileDialog* dialog) const;
 };
 
 #endif  // QT_CHOOSER_WIDGET_HPP
