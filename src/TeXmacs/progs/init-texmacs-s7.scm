@@ -61,7 +61,7 @@
 (display "Booting TeXmacs kernel functionality\n")
 (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot-s7.scm"))
 
-(inherit-modules (kernel boot compat-s7) (kernel boot abbrevs)
+(inherit-modules (kernel boot compat-s7) (kernel boot abbrevs-s7)
                  (kernel boot debug) (kernel boot srfi)
                  (kernel boot ahash-table) (kernel boot prologue))
 (inherit-modules (kernel library base) (kernel library list)
@@ -529,3 +529,8 @@
                   ;(quit-TeXmacs)
                   ))))))))))))
 
+;; iota is not implemented for s7.
+(tm-define (iota n)
+  (let loop ((count (1- n)) (result '()))
+    (if (< count 0) result
+        (loop (1- count) (cons count result)))))
