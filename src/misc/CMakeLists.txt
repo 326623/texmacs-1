@@ -16,5 +16,5 @@ foreach(TOOL ${TOOLS})
     VERBATIM
   )
   add_custom_target(${TOOL}.${MAN_SECTION} ALL DEPENDS ${TOOL_MANFILE_GZ})
-  install(FILES ${TOOL_MANFILE_GZ} DESTINATION share/man/man${MAN_SECTION})
+#  install(FILES ${TOOL_MANFILE_GZ} DESTINATION share/man/man${MAN_SECTION})
 endforeach(TOOL)

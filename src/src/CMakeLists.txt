@@ -27,6 +27,7 @@ target_link_libraries (${TeXmacs_binary_name}
   ${TeXmacs_Libraries}
 )
 
+# TODO: some more work here -- include the Scheme source.
 if (APPLE)
   set(MACOSX_BUNDLE_DISPLAY_NAME TeXmacs)
   set_target_properties (${TeXmacs_binary_name}
@@ -38,7 +39,31 @@ if (APPLE)
     RUNTIME_OUTPUT_DIRECTORY ${TEXMACS_BINARY_DIR}
   )
 elseif (WIN32)
-  install (TARGETS ${TeXmacs_binary_name} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+#  # Doesn't need this for static builds -- sort of
+#  install(
+#          TARGETS ${}
+#          ARCHIVE
+#          DESTINATION lib
+#          COMPONENT libraries
+#  )
+  install(
+          TARGETS ${TeXmacs_binary_name}
+          RUNTIME
+          DESTINATION bin
+          COMPONENT applications
+  )
+# Doesn't need this for shipping application
+#  install(
+#          FILES mylib.h
+#          DESTINATION include
+#          COMPONENT headers
+#  )
+  include(InstallRequiredSystemLibraries)
+  set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
+  set(CPACK_PACKAGE_VERSION_MAJOR "${VERSION_MAJOR}")
+  set(CPACK_PACKAGE_VERSION_MINOR "${VERSION_MINOR}")
+  set(CPACK_PACKAGE_VERSION_PATCH "${VERSION_BUILD}")
+  include(CPack)
 else (APPLE)
   install (TARGETS ${TeXmacs_binary_name} DESTINATION ${tmbin}/bin)
 endif (APPLE)

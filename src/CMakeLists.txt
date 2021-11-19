@@ -755,15 +755,17 @@ if (NOT WIN32)
           DESTINATION bin
           PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
                       GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ)
+  ### include/
+  install (DIRECTORY TeXmacs/include DESTINATION ${CMAKE_INSTALL_PREFIX}
+          FILE_PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)
 endif (NOT WIN32)
-
-### include/
-install (DIRECTORY TeXmacs/include DESTINATION ${CMAKE_INSTALL_PREFIX}
-  FILE_PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)
 
 ### share/
 if (WIN32)
-  install (DIRECTORY plugins DESTINATION ${CMAKE_INSTALL_PREFIX}
+  ### include/
+  install (DIRECTORY TeXmacs/include DESTINATION include
+          FILE_PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)
+  install (DIRECTORY plugins DESTINATION plugins
     FILE_PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
     PATTERN "bin" EXCLUDE
     PATTERN "CMakeLists.txt" EXCLUDE
@@ -814,5 +816,6 @@ configure_file (${TEXMACS_SOURCE_DIR}/misc/vscode/c_cpp_properties.json.in
 message (STATUS "TeXmacs_Libraries" ${TeXmacs_Libraries})
 
 ## MINGW packaging
+## https://stackoverflow.com/questions/41193584/deploy-all-qt-dependencies-when-building
 # copydll.sh and QT_PLUGINS_PATH
 # Also need to copy all scheme source code one directory outside of the binary.

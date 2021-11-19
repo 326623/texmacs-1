@@ -11,6 +11,19 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(when (equal? (scheme-dialect) "s7")
+  (begin
+    ;; Preallocate memory for speed.
+    (set! (*s7* 'heap-size) 1024000)
+    (set! (*s7* 'gc-resize-heap-by-4-fraction) 0.25)
+    (set! (*s7* 'gc-resize-heap-fraction) 0.5)
+    ;; For gc activity
+    ;; (set! (*s7* 'gc-stats) 1)
+    ;; For heap stack activity
+    ;; (set! (*s7* 'gc-stats) 2)
+    ;; For both gc and heap activity
+    (set! (*s7* 'gc-stats) 3)
+    (set! (*s7* 'profile) 2)))
 
 ;; S7 macros are not usual macros...
 (define define-macro define-expansion)
